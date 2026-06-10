@@ -618,10 +618,12 @@ def verify_payment(request):
 
                 profile.badges = current_badges
                 profile.save()
-# Dispatch email confirmation after transaction commits
-transaction.on_commit(
-    lambda: dispatch_booking_email(booking.id)
-)
+
+                # Dispatch email confirmation after transaction commits
+                transaction.on_commit(
+                    lambda: dispatch_booking_email(booking.id)
+                )
+
                 return Response({
                     'status': 'SUCCESS',
                     'message': 'Ticket booked successfully!',
