@@ -7,12 +7,8 @@ from .models import Booking
 
 logger = logging.getLogger(__name__)
 
-from django.core.mail import EmailMultiAlternatives
-from .pdf_utils import generate_booking_pdf
-
 def generate_ticket_html(booking, show, user, seats_str):
-  """Renders a beautiful inline-CSS styled cyberpunk ticket HTML email with embedded base64 QR."""
-  qr_src = booking.qr_image if booking.qr_image else f"https://api.qrserver.com/v1/create-qr-code/?size=120x120&color=00f2fe&bgcolor=06070d&data={booking.booking_id}"
+  """Renders a beautiful inline-CSS styled cyberpunk ticket HTML email."""
   return f"""
   <!DOCTYPE html>
   <html>
@@ -100,11 +96,11 @@ def generate_ticket_html(booking, show, user, seats_str):
             </tr>
           </table>
           
-          <!-- Secure QR scan block -->
+          <!-- Mock QR scan reminder -->
           <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
             <tr>
               <td align="center" style="background-color: #06070d; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 15px;">
-                <img src="{qr_src}" width="120" height="120" alt="Broadcast QR Code" style="display:block; border-radius:4px;" />
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&color=00f2fe&bgcolor=06070d&data=SZ-CONF-{booking.id}" width="120" height="120" alt="Broadcast QR Code" style="display:block; border-radius:4px;" />
                 <div style="font-size: 9px; color:#8e9bb3; letter-spacing:1px; margin-top:8px; text-transform:uppercase;">
                   SCAN AT AUDI ENTRY
                 </div>
@@ -124,7 +120,7 @@ def generate_ticket_html(booking, show, user, seats_str):
   """
 
 def send_booking_email_sync(booking_id):
-  """Synchronous logic that does the database query, generates the PDF, and sends the email with PDF attachment."""
+  """Synchronous logic that does the database query and calls send_mail."""
   try:
     booking = Booking.objects.get(pk=booking_id)
     if booking.booking_status != 'CONFIRMED':
@@ -144,24 +140,23 @@ def send_booking_email_sync(booking_id):
     if user.email:
       recipients.append(user.email)
     
-    import sys
-    is_testing = 'test' in sys.argv
-    
     from django.conf import settings
     audit_email = getattr(settings, 'CONFIRMATION_AUDIT_EMAIL', '')
-    if audit_email and audit_email not in recipients and not is_testing:
+    if audit_email and audit_email not in recipients:
       recipients.append(audit_email)
       
     if not recipients:
       recipients = ["customer@example.com"]
-    
-      pdf_bytes = generate_booking_pdf(booking)
-      email.attach(f"showzy_ticket_{booking.booking_id}.pdf", pdf_bytes, "application/pdf")
-    except Exception as pdf_err:
-      logger.error(f"Failed to generate/attach PDF for booking {booking_id}: {str(pdf_err)}")
       
-    email.send(fail_silently=False)
-    logger.info(f"Successfully sent confirmation email with PDF for booking {booking_id} to {recipients}")
+    send_mail(
+      subject=subject,
+      message=text_content,
+      from_email=None,  # Uses DEFAULT_FROM_EMAIL from settings
+      recipient_list=recipients,
+      html_message=html_content,
+      fail_silently=False,
+    )
+    logger.info(f"Successfully sent confirmation email for booking {booking_id} to {user.email}")
     return True
   except Booking.DoesNotExist:
     logger.error(f"Booking {booking_id} not found to send email.")
@@ -170,34 +165,7 @@ def send_booking_email_sync(booking_id):
     logger.exception(f"Error sending booking email for booking {booking_id}: {str(e)}")
     return False
 
-@shared_task(name="api.tasks  
-    from django.conf import settings
-
-email = EmailMultiAlternatives(
-    subject=subject,
-    body=text_content,
-    from_email=settings.DEFAULT_FROM_EMAIL,
-    to=recipients,
-)
-    email.attach_alternative(html_content, "text/html")
-    email.attach_alternative(html_content, "text/html")
-
-# Generate PDF bytes and attach
-try:
-    pdf_bytes = generate_booking_pdf(booking)
-    email.attach(
-        f"showzy_ticket_{booking.booking_id}.pdf",
-        pdf_bytes,
-        "application/pdf",
-    )
-except Exception as pdf_err:
-    logger.error(
-        f"Failed to generate/attach PDF for booking {booking_id}: {str(pdf_err)}"
-    )
-
-email.send(fail_silently=False)
-    # Generate PDF bytes and attach
-    try:.send_booking_email_task")
+@shared_task(name="api.tasks.send_booking_email_task")
 def send_booking_email_task(booking_id):
   """Celery shared task wrapper."""
   return send_booking_email_sync(booking_id)
@@ -214,26 +182,22 @@ def is_redis_available():
     return False
 
 def dispatch_booking_email(booking_id):
-    """
-    Hybrid async dispatcher:
-    Tries dispatching via Celery worker if Redis is running.
-    Otherwise, sends the email synchronously.
-    """
-    if is_redis_available():
-        try:
-            # Trigger via Celery
-            send_booking_email_task.delay(booking_id)
-            logger.info(
-                f"Dispatched email task {booking_id} via Celery queue."
-            )
-            return
-        except Exception as e:
-            logger.warning(
-                f"Celery queue dispatch failed: {str(e)}. Falling back to synchronous email."
-            )
-
-    # Fallback: send synchronously
-    logger.info(
-        f"Redis is offline. Sending email synchronously for booking {booking_id}."
-    )
-    send_booking_email_sync(booking_id)
+  """
+  Hybrid async dispatcher:
+  Tries dispatching via Celery worker if Redis is running.
+  Otherwise, directly dispatches in a background Thread.
+  """
+  if is_redis_available():
+    try:
+      # Trigger via Celery .delay()
+      send_booking_email_task.delay(booking_id)
+      logger.info(f"Dispatched email task {booking_id} via Celery queue.")
+      return
+    except Exception as e:
+      logger.warning(f"Celery queue dispatch failed: {str(e)}. Falling back to background thread.")
+  
+  # Fallback directly to background thread without blocking
+  logger.info(f"Redis is offline. Falling back to background thread email dispatcher for booking {booking_id}.")
+  thread = threading.Thread(target=send_booking_email_sync, args=(booking_id,))
+  thread.daemon = True
+  thread.start()
