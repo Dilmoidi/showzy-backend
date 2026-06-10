@@ -154,18 +154,7 @@ def send_booking_email_sync(booking_id):
       
     if not recipients:
       recipients = ["customer@example.com"]
-      
-    # Prepare email with attachment
-    email = EmailMultiAlternatives(
-      subject=subject,
-      body=text_content,
-      from_email=None,  # Uses DEFAULT_FROM_EMAIL from settings
-      to=recipients,
-    )
-    email.attach_alternative(html_content, "text/html")
     
-    # Generate PDF bytes and attach
-    try:
       pdf_bytes = generate_booking_pdf(booking)
       email.attach(f"showzy_ticket_{booking.booking_id}.pdf", pdf_bytes, "application/pdf")
     except Exception as pdf_err:
@@ -181,7 +170,34 @@ def send_booking_email_sync(booking_id):
     logger.exception(f"Error sending booking email for booking {booking_id}: {str(e)}")
     return False
 
-@shared_task(name="api.tasks.send_booking_email_task")
+@shared_task(name="api.tasks  
+    from django.conf import settings
+
+email = EmailMultiAlternatives(
+    subject=subject,
+    body=text_content,
+    from_email=settings.DEFAULT_FROM_EMAIL,
+    to=recipients,
+)
+    email.attach_alternative(html_content, "text/html")
+    email.attach_alternative(html_content, "text/html")
+
+# Generate PDF bytes and attach
+try:
+    pdf_bytes = generate_booking_pdf(booking)
+    email.attach(
+        f"showzy_ticket_{booking.booking_id}.pdf",
+        pdf_bytes,
+        "application/pdf",
+    )
+except Exception as pdf_err:
+    logger.error(
+        f"Failed to generate/attach PDF for booking {booking_id}: {str(pdf_err)}"
+    )
+
+email.send(fail_silently=False)
+    # Generate PDF bytes and attach
+    try:.send_booking_email_task")
 def send_booking_email_task(booking_id):
   """Celery shared task wrapper."""
   return send_booking_email_sync(booking_id)
