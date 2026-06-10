@@ -2090,11 +2090,3 @@ def seed_database(request):
     return HttpResponse("Database seeded successfully!")
 from django.http import HttpResponse
 
-def seed_database(request):
-    import populate_movies
-    import populate_food
-
-    populate_movies.populate()
-    populate_food.populate()
-
-    return HttpResponse("Database seeded successfully!")
