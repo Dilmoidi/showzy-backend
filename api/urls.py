@@ -78,4 +78,5 @@ urlpatterns = [
     path('download-ticket/', views.download_ticket_pdf, name='download_ticket_pdf_query'),
     path('download-ticket/<str:booking_id>/', views.download_ticket_pdf, name='download_ticket_pdf'),
     path('book/', views.mock_book_seats, name='mock_book_seats'),
+    path('seed/', views.seed_database, name='seed_database'),
 ]

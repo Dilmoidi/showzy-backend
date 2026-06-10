@@ -2078,3 +2078,23 @@ def add_food_to_booking(request, booking_id):
             return Response({'success': True, 'total_amount': float(booking.total_amount)})
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+from django.http import HttpResponse
+
+def seed_database(request):
+    import populate_movies
+    import populate_food
+
+    populate_movies.populate()
+    populate_food.populate()
+
+    return HttpResponse("Database seeded successfully!")
+from django.http import HttpResponse
+
+def seed_database(request):
+    import populate_movies
+    import populate_food
+
+    populate_movies.populate()
+    populate_food.populate()
+
+    return HttpResponse("Database seeded successfully!")
