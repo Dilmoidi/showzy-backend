@@ -198,20 +198,26 @@ def is_redis_available():
     return False
 
 def dispatch_booking_email(booking_id):
-  """
-  Hybrid async dispatcher:
-  Tries dispatching via Celery worker if Redis is running.
-  Otherwise, directly dispatches in a background Thread.
-  """
-  if is_redis_available():
-    try:
-      # Trigger via Celery .delay()
-      send_booking_email_task.delay(booking_id)
-      logger.info(f"Dispatched email task {booking_id} via Celery queue.")
-      return
-    except Exception as e:
-      logger.warning(f"Celery queue dispatch failed: {str(e)}. Falling back to background thread.")
-  
- # Fallback: send synchronously
-logger.info(f"Redis is offline. Sending email synchronously for booking {booking_id}.")
-send_booking_email_sync(booking_id)
+    """
+    Hybrid async dispatcher:
+    Tries dispatching via Celery worker if Redis is running.
+    Otherwise, sends the email synchronously.
+    """
+    if is_redis_available():
+        try:
+            # Trigger via Celery
+            send_booking_email_task.delay(booking_id)
+            logger.info(
+                f"Dispatched email task {booking_id} via Celery queue."
+            )
+            return
+        except Exception as e:
+            logger.warning(
+                f"Celery queue dispatch failed: {str(e)}. Falling back to synchronous email."
+            )
+
+    # Fallback: send synchronously
+    logger.info(
+        f"Redis is offline. Sending email synchronously for booking {booking_id}."
+    )
+    send_booking_email_sync(booking_id)

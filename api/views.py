@@ -7,7 +7,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from .tasks import send_booking_email_sync send_booking_email_sync(booking.id)
+from .tasks import send_booking_email_sync 
 
 from rest_framework import status, views, permissions, authentication
 from rest_framework.response import Response
