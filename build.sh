@@ -13,6 +13,6 @@ python manage.py migrate
 
 echo "Seeding data..."
 
-python populate_movies.py
-python populate_food.py
+echo "Seeding database..."
 
+python manage.py seed
