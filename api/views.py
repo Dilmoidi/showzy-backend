@@ -7,6 +7,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from .tasks import send_booking_email_sync
 
 from rest_framework import status, views, permissions, authentication
 from rest_framework.response import Response
@@ -617,10 +618,8 @@ def verify_payment(request):
 
                 profile.badges = current_badges
                 profile.save()
-
-                # Dispatch email confirmation after transaction commits
-                transaction.on_commit(lambda: dispatch_booking_email(booking.id))
-
+# Send confirmation email immediately
+send_booking_email_sync(booking.id)
                 return Response({
                     'status': 'SUCCESS',
                     'message': 'Ticket booked successfully!',
