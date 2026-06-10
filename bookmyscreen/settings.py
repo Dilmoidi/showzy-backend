@@ -182,7 +182,6 @@ DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
     f"Showzy <{EMAIL_HOST_USER}>"
 )
-
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # Celery Settings
