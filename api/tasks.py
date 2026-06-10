@@ -1,6 +1,5 @@
 import logging
 import socket
-import threading
 
 from celery import shared_task
 from django.conf import settings
@@ -213,7 +212,7 @@ def is_redis_available():
 def dispatch_booking_email(booking_id):
     """
     Dispatch booking email via Celery when Redis is available.
-    Fall back to a background thread when the queue is unavailable.
+    Fall back to direct sending when the queue is unavailable.
     """
     if is_redis_available():
         try:
@@ -222,15 +221,13 @@ def dispatch_booking_email(booking_id):
             return
         except Exception as exc:
             logger.warning(
-                "Celery queue dispatch failed for booking %s: %s. Falling back to background thread.",
+                "Celery queue dispatch failed for booking %s: %s. Falling back to direct send.",
                 booking_id,
                 exc,
             )
 
     logger.info(
-        "Redis is offline. Falling back to background thread email dispatcher for booking %s.",
+        "Redis is offline. Falling back to direct email send for booking %s.",
         booking_id,
     )
-    thread = threading.Thread(target=send_booking_email_sync, args=(booking_id,))
-    thread.daemon = True
-    thread.start()
+    return send_booking_email_sync(booking_id)

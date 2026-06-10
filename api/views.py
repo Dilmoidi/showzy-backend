@@ -4,10 +4,10 @@ import decimal
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, Count
+from django.http import HttpResponse
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from .tasks import send_booking_email_sync 
 
 from rest_framework import status, views, permissions, authentication
 from rest_framework.response import Response
@@ -558,10 +558,8 @@ def verify_payment(request):
                 import base64
                 
                 qr_token = secrets.token_urlsafe(32)
-                qr_payload = json.dumps({
-                    "booking_id": str(booking.booking_id),
-                    "token": qr_token
-                })
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'https://showzy-frontend.vercel.app')
+                qr_payload = f"{frontend_url}/ticket/{booking.booking_id}?token={qr_token}"
                 
                 qr = qrcode.QRCode(version=1, box_size=10, border=4)
                 qr.add_data(qr_payload)
@@ -1687,6 +1685,17 @@ def ticket_detail_api(request, booking_id):
             booking = Booking.objects.get(booking_id=booking_id)
         else:
             booking = Booking.objects.get(id=booking_id)
+            
+        token = request.query_params.get('token')
+        
+        is_authenticated = request.user and request.user.is_authenticated
+        is_owner = is_authenticated and booking.user == request.user
+        is_staff = is_authenticated and (request.user.is_staff or request.user.is_superuser or check_role(request.user, ['THEATRE_ADMIN', 'SUPERADMIN']))
+        
+        if not is_owner and not is_staff:
+            if not token or booking.qr_token != token:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+                
         serializer = BookingSerializer(booking)
         return Response(serializer.data)
     except Booking.DoesNotExist:
@@ -1732,7 +1741,6 @@ def list_scan_logs_api(request):
     return Response(logs_data)
 
 
-from django.http import HttpResponse
 from .pdf_utils import generate_booking_pdf
 
 @api_view(['GET'])
@@ -2081,8 +2089,6 @@ def add_food_to_booking(request, booking_id):
             return Response({'success': True, 'total_amount': float(booking.total_amount)})
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-from django.http import HttpResponse
-
 def seed_database(request):
     import populate_movies
     import populate_food
@@ -2091,5 +2097,4 @@ def seed_database(request):
     populate_food.populate()
 
     return HttpResponse("Database seeded successfully!")
-from django.http import HttpResponse
 
